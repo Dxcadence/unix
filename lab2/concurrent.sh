@@ -13,38 +13,44 @@ touch "$LOCK_FILE"
 echo "[INFO] Starting script for container ID: $CONTAINER_ID"
 
 while true; do
-  name=$( (
+  (
     flock 200
 
     i=1
     while [ "$i" -le 9999 ]; do
       name=$(printf "%03d" "$i")
       if [ ! -e "$SHARED_DIR/$name" ]; then
-        echo "$name"
-        exit 0
+        break
       fi
       i=$((i + 1))
     done
 
-    echo ""  
-    exit 1
+    if [ "$i" -gt 9999 ]; then
+      echo ""
+      exit 1
+    fi
 
-  ) 200>"$LOCK_FILE" )
+    echo "$CONTAINER_ID:$FILE_COUNTER" > "$SHARED_DIR/$name"
+    echo "[DEBUG] Created file $SHARED_DIR/$name with content: $CONTAINER_ID:$FILE_COUNTER"
 
-  if [ -z "$name" ]; then
-    echo "No available filename found, retrying..."
+    sleep 1
+
+    rm -f "$SHARED_DIR/$name" && \
+      echo "[DEBUG] Removed file: $SHARED_DIR/$name" || \
+      echo "[ERROR] Failed to remove file: $SHARED_DIR/$name"
+
+    echo "$name"
+    exit 0
+
+  ) 200>"$LOCK_FILE"
+
+  name="$?"
+
+  if [ "$name" -ne 0 ]; then
+    echo "No available filename found or failed to acquire lock, retrying..."
     sleep 5
     continue
   fi
-
-  echo "$CONTAINER_ID:$FILE_COUNTER" > "$SHARED_DIR/$name"
-  echo "[DEBUG] Created file $SHARED_DIR/$name with content: $CONTAINER_ID:$FILE_COUNTER"
-
-  sleep 1
-
-  rm -f "$SHARED_DIR/$name" && \
-    echo "[DEBUG] Removed file: $SHARED_DIR/$name" || \
-    echo "[ERROR] Failed to remove file: $SHARED_DIR/$name"
 
   FILE_COUNTER=$((FILE_COUNTER + 1))
 
