@@ -13,7 +13,8 @@ touch "$LOCK_FILE"
 echo "[INFO] Starting script for container ID: $CONTAINER_ID"
 
 while true; do
-  (
+  # Run name selection and file creation inside flock block
+  tmp_name=$( (
     flock 200
 
     i=1
@@ -25,31 +26,40 @@ while true; do
       i=$((i + 1))
     done
 
-    if [ "$i" -gt 9999 ]; then
+    if [ -z "$name" ]; then
       echo ""
       exit 1
     fi
 
     echo "$CONTAINER_ID:$FILE_COUNTER" > "$SHARED_DIR/$name"
-    echo "[DEBUG] Created file $SHARED_DIR/$name with content: $CONTAINER_ID:$FILE_COUNTER"
-
-    sleep 1
-
-    rm -f "$SHARED_DIR/$name" && \
-      echo "[DEBUG] Removed file: $SHARED_DIR/$name" || \
-      echo "[ERROR] Failed to remove file: $SHARED_DIR/$name"
-
     echo "$name"
     exit 0
 
-  ) 200>"$LOCK_FILE"
+  ) 200>"$LOCK_FILE" )
 
-  name="$?"
+  name_exit_code="$?"
+  name="$tmp_name"
 
-  if [ "$name" -ne 0 ]; then
+  if [ "$name_exit_code" -ne 0 ]; then
     echo "No available filename found or failed to acquire lock, retrying..."
     sleep 5
     continue
+  fi
+
+  # Logging after file creation
+  echo "[DEBUG] Created file $SHARED_DIR/$name with content: $CONTAINER_ID:$FILE_COUNTER"
+
+  sleep 1
+
+  # Optional safety check before deletion
+  expected_content="$CONTAINER_ID:$FILE_COUNTER"
+  current_content="$(cat "$SHARED_DIR/$name" 2>/dev/null)"
+
+  if [ "$current_content" = "$expected_content" ]; then
+    rm -f "$SHARED_DIR/$name" && \
+      echo "[DEBUG] Removed file: $SHARED_DIR/$name"
+  else
+    echo "[WARN] File changed or reused by another container — not deleting: $SHARED_DIR/$name"
   fi
 
   FILE_COUNTER=$((FILE_COUNTER + 1))
