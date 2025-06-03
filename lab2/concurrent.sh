@@ -13,7 +13,6 @@ touch "$LOCK_FILE"
 echo "[INFO] Starting script for container ID: $CONTAINER_ID"
 
 while true; do
-  # Run name selection and file creation inside flock block
   tmp_name=$( (
     flock 200
 
@@ -41,17 +40,15 @@ while true; do
   name="$tmp_name"
 
   if [ "$name_exit_code" -ne 0 ]; then
-    echo "No available filename found or failed to acquire lock, retrying..."
+    echo "No available filename found, retrying..."
     sleep 5
     continue
   fi
 
-  # Logging after file creation
   echo "[DEBUG] Created file $SHARED_DIR/$name with content: $CONTAINER_ID:$FILE_COUNTER"
 
   sleep 1
 
-  # Optional safety check before deletion
   expected_content="$CONTAINER_ID:$FILE_COUNTER"
   current_content="$(cat "$SHARED_DIR/$name" 2>/dev/null)"
 
