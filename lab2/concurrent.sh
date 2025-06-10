@@ -17,7 +17,7 @@ while true; do
     flock 200
 
     i=1
-    while [ "$i" -le 9999 ]; do
+    while [ "$i" -le 999 ]; do
       name=$(printf "%03d" "$i")
       if [ ! -e "$SHARED_DIR/$name" ]; then
         break

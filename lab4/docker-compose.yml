@@ -1,0 +1,42 @@
+networks:
+  default:
+    name: labnet
+    driver: bridge
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    hostname: kafka
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CFG_PROCESS_ROLES: broker
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: PLAINTEXT
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
+      KAFKA_CFG_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@kafka:19091"
+      KAFKA_CREATE_TOPICS: "tasks:5:1"
+
+  producer:
+    build: ./producer
+    depends_on:
+      - kafka
+
+  worker:
+    build: ./worker
+    depends_on:
+      - kafka
